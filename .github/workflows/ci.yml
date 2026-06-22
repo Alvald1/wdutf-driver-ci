@@ -14,6 +14,13 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Setup build tools
+        shell: cmd
+        run: |
+          if not exist tools\bin\sed.exe (
+            copy "C:\Program Files\Git\usr\bin\sed.exe" tools\bin\sed.exe
+          )
+
       - name: Build
         shell: cmd
         run: |
