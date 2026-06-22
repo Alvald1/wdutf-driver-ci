@@ -4,10 +4,11 @@ on:
   push:
   pull_request:
   schedule:
-    - cron: "0 2 * * *"
+    - cron: "0 2 * * *"   # ночной фаззинг (fork-режим)
 
 jobs:
   build-and-test:
+    if: github.event_name != 'schedule'
     runs-on: [self-hosted, windows, wdk]
     steps:
       - uses: actions/checkout@v4
@@ -26,7 +27,7 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
-          msbuild WDUTF.sln /p:Configuration=Debug /p:Platform=x64 /m /p:RunInfVerif=false
+          msbuild WDUTF.sln /p:Configuration=Debug /p:Platform=x64 /m
 
       - name: Unit tests
         shell: cmd
@@ -39,7 +40,9 @@ jobs:
           name: test-results
           path: results\*.trx
 
+  # Быстрый дымовой фаззинг на каждое изменение — persistent mode (приоритет: скорость)
   fuzz-smoke:
+    if: github.event_name != 'schedule'
     runs-on: [self-hosted, Linux, X64]
     steps:
       - uses: actions/checkout@v4
@@ -47,24 +50,54 @@ jobs:
       - name: Build fuzz image
         run: docker build -t driver-fuzz fuzz/
 
-      - name: Smoke fuzz 5s
+      - name: Smoke fuzz (persistent, 60s)
         run: |
           docker run --name fuzz-run --entrypoint afl-fuzz driver-fuzz \
-            -i /corpus -o /findings -V 5 -- /fuzz/harness @@ || true
+            -i /corpus -o /findings -V 60 -- /fuzz/harness_persist || true
           docker cp fuzz-run:/findings/default ./findings || true
           docker rm fuzz-run || true
-          # Переименовываем файлы: двоеточия и запятые → подчёркивания
           find findings/ -type f | while read f; do
             newf=$(echo "$f" | tr ':,' '__')
             [ "$f" != "$newf" ] && mv "$f" "$newf"
           done
-          echo "=== findings ==="
-          ls -la findings/ || echo "empty"
+          echo "=== findings (smoke / persistent) ==="
+          grep -E 'execs_per_sec|saved_crashes' findings/fuzzer_stats || true
           ls -la findings/crashes/ 2>/dev/null || echo "no crashes"
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: fuzz-findings
+          name: fuzz-findings-smoke
+          path: findings/
+          if-no-files-found: warn
+
+  # Продолжительный ночной фаззинг по расписанию — fork-режим (приоритет: изоляция)
+  fuzz-nightly:
+    if: github.event_name == 'schedule'
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build fuzz image
+        run: docker build -t driver-fuzz fuzz/
+
+      - name: Nightly fuzz (fork, 300s)
+        run: |
+          docker run --name fuzz-run --entrypoint afl-fuzz driver-fuzz \
+            -i /corpus -o /findings -V 300 -- /fuzz/harness_fork @@ || true
+          docker cp fuzz-run:/findings/default ./findings || true
+          docker rm fuzz-run || true
+          find findings/ -type f | while read f; do
+            newf=$(echo "$f" | tr ':,' '__')
+            [ "$f" != "$newf" ] && mv "$f" "$newf"
+          done
+          echo "=== findings (nightly / fork) ==="
+          grep -E 'execs_per_sec|saved_crashes' findings/fuzzer_stats || true
+          ls -la findings/crashes/ 2>/dev/null || echo "no crashes"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fuzz-findings-nightly
           path: findings/
           if-no-files-found: warn
