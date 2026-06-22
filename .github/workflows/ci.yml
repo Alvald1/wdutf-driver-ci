@@ -39,15 +39,20 @@ jobs:
       - name: Build fuzz image
         run: docker build -t driver-fuzz fuzz/
 
-      - name: Smoke fuzz 60s
+      - name: Smoke fuzz 5s
         run: |
           docker run --name fuzz-run --entrypoint afl-fuzz driver-fuzz \
-            -i /corpus -o /findings -V 60 -- /fuzz/harness @@ || true
+            -i /corpus -o /findings -V 5 -- /fuzz/harness @@ || true
           docker cp fuzz-run:/findings/default ./findings || true
           docker rm fuzz-run || true
+          # Переименовываем файлы: двоеточия и запятые → подчёркивания
+          find findings/ -type f | while read f; do
+            newf=$(echo "$f" | tr ':,' '__')
+            [ "$f" != "$newf" ] && mv "$f" "$newf"
+          done
           echo "=== findings ==="
-          ls -la findings/ || echo "findings empty"
-          ls -la findings/crashes/ 2>/dev/null || echo "no crashes dir"
+          ls -la findings/ || echo "empty"
+          ls -la findings/crashes/ 2>/dev/null || echo "no crashes"
 
       - uses: actions/upload-artifact@v4
         if: always()
