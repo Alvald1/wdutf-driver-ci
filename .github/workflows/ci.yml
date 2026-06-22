@@ -19,8 +19,8 @@ jobs:
         run: |
           if not exist tools\bin\sed.exe (
             copy "C:\Program Files\Git\usr\bin\sed.exe" tools\bin\sed.exe
-            copy "C:\Program Files\Git\usr\bin\msys-2.0.dll" tools\bin\msys-2.0.dll
           )
+          echo C:\Program Files\Git\usr\bin>>%GITHUB_PATH%
 
       - name: Build
         shell: cmd
