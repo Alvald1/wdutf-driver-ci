@@ -52,14 +52,14 @@ jobs:
 
       - name: Smoke fuzz (persistent, 60s)
         run: |
+          docker rm -f fuzz-run 2>/dev/null || true   # очистка контейнера от прошлого прогона (self-hosted)
+          rm -rf findings && mkdir -p findings
           docker run --name fuzz-run --entrypoint afl-fuzz driver-fuzz \
             -i /corpus -o /findings -V 60 -- /fuzz/harness_persist || true
           docker cp fuzz-run:/findings/default ./findings || true
-          docker rm fuzz-run || true
+          docker rm -f fuzz-run 2>/dev/null || true
           find findings/ -type f | while read f; do
-            newf=$(echo "$f" | tr ':,' '__')
-            [ "$f" != "$newf" ] && mv "$f" "$newf"
-          done
+            mv "$f" "$(echo "$f" | tr ':,' '__')" 2>/dev/null || true; done
           echo "=== findings (smoke / persistent) ==="
           grep -E 'execs_per_sec|saved_crashes' findings/fuzzer_stats || true
           ls -la findings/crashes/ 2>/dev/null || echo "no crashes"
@@ -83,14 +83,14 @@ jobs:
 
       - name: Nightly fuzz (fork, 300s)
         run: |
+          docker rm -f fuzz-run 2>/dev/null || true   # очистка контейнера от прошлого прогона (self-hosted)
+          rm -rf findings && mkdir -p findings
           docker run --name fuzz-run --entrypoint afl-fuzz driver-fuzz \
             -i /corpus -o /findings -V 300 -- /fuzz/harness_fork @@ || true
           docker cp fuzz-run:/findings/default ./findings || true
-          docker rm fuzz-run || true
+          docker rm -f fuzz-run 2>/dev/null || true
           find findings/ -type f | while read f; do
-            newf=$(echo "$f" | tr ':,' '__')
-            [ "$f" != "$newf" ] && mv "$f" "$newf"
-          done
+            mv "$f" "$(echo "$f" | tr ':,' '__')" 2>/dev/null || true; done
           echo "=== findings (nightly / fork) ==="
           grep -E 'execs_per_sec|saved_crashes' findings/fuzzer_stats || true
           ls -la findings/crashes/ 2>/dev/null || echo "no crashes"
