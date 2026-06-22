@@ -41,13 +41,17 @@ jobs:
 
       - name: Smoke fuzz 60s
         run: |
-          mkdir -p findings
           docker run --name fuzz-run --entrypoint afl-fuzz driver-fuzz \
             -i /corpus -o /findings -V 60 -- /fuzz/harness @@ || true
-          docker cp fuzz-run:/findings ./findings || true
+          docker cp fuzz-run:/findings/default ./findings || true
           docker rm fuzz-run || true
+          echo "=== findings ==="
+          ls -la findings/ || echo "findings empty"
+          ls -la findings/crashes/ 2>/dev/null || echo "no crashes dir"
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: fuzz-findings
           path: findings/
+          if-no-files-found: warn
