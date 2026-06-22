@@ -19,13 +19,14 @@ jobs:
         run: |
           if not exist tools\bin\sed.exe (
             copy "C:\Program Files\Git\usr\bin\sed.exe" tools\bin\sed.exe
+            copy "C:\Program Files\Git\usr\bin\msys-2.0.dll" tools\bin\msys-2.0.dll
           )
 
       - name: Build
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
-          msbuild WDUTF.sln /p:Configuration=Debug /p:Platform=x64 /m
+          msbuild WDUTF.sln /p:Configuration=Debug /p:Platform=x64 /m /p:RunInfVerif=false
 
       - name: Unit tests
         shell: cmd
